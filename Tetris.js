@@ -19,7 +19,11 @@ export default class Tetris {
     this.tetromino = new Array(7)
     this.init_tetrominos()
 
-
+    this.nCurrentPiece = 1;
+    this.nCurrentRotation = 0;
+    this.nCurrentX = this.nFieldWidth / 2;
+    this.nCurrentY = 0;
+    
   }
 
   prepareField() {
@@ -39,7 +43,7 @@ export default class Tetris {
     let tempX = index % this.nFieldWidth
     let tempY = Math.floor(index/this.nFieldWidth)
 
-    let ScreenOffset = tempY * this.vs.nbCols + tempX
+    let ScreenOffset = tempY * this.vs.nbCols + tempX 
     let n = st.length
       if( n ==1 ) this.Screen[ScreenOffset]=st
     else
@@ -49,12 +53,20 @@ export default class Tetris {
 
   update() {
 
-    // whrite Field into Screen memory
+    // write Field into Screen memory
     for (let x=0; x<this.nFieldWidth;x++)
       for (let y=0; y<this.nFieldHeight; y++)
       {
         let c= ' ABCDEFG=#'.charAt(this.pField[y*this.nFieldWidth + x])
-        this.setscreen(c,x,y)    
+        this.setscreen(c,x,y+2)    
+      }
+
+    for (let px = 0; px < 4; px++)
+      for (let py = 0; py < 4; py++) {
+        let rotated = this.Rotate(px, py, this.nCurrentRotation)
+        if (this.tetromino[this.nCurrentPiece][rotated] != '.')
+        this.pField[(this.nCurrentY + py) * this.nFieldWidth + (this.nCurrentX + px)] = this.nCurrentPiece + 1;
+
       }
   }
 
@@ -89,6 +101,9 @@ export default class Tetris {
     return pi;
   }
 
+  // checks this a piece, rotated or not, would fit at position nPosX,nPosY
+  // if not, one of its 'filled cells' will collide with a value of pField !=0 (failure, return false)
+  // if every 'filled cell', would be on zeros, then the tetramino would fit (success, return true)
   DoesPieceFit(nTetromino, nRotation, nPosX, nPosY) {
     // All Field cells >0 are occupied
     for (let px = 0; px < 4; px++)
