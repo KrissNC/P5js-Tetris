@@ -8,7 +8,7 @@ export default class Tetris {
 
     this.State='R'; // Running, Paused, Over, Menu, Waiting
 
-    this.vs = new VirtualConsole(40,20, 8, 12, 'Courier Prime',12)
+    this.vs = new VirtualConsole(40,20, 8, 10, 'Courier Prime',12)
     this.vs.setOriginX(20)
     this.vs.setOriginY(10)
     this.Screen = this.vs.chars // to directly address VirtualScreen array
@@ -19,11 +19,23 @@ export default class Tetris {
     this.tetromino = new Array(7)
     this.init_tetrominos()
 
-    this.nCurrentPiece = 1;
+    this.nCurrentPiece = 0; // 0 to 6
     this.nCurrentRotation = 0;
     this.nCurrentX = this.nFieldWidth / 2;
     this.nCurrentY = 0;
-    
+
+    this.tickDuration = 50.0  // 100ms // time base . 
+                               // time driven events should rely on this
+    this.newHeartBeat = false
+    this.currentDuration = 0.0
+
+    this.delayCounter = 0.0
+    this.delayDuration = 0.0
+
+    this.bKey=''
+    this.keyHeld=false
+    this.previousKeyCode=0
+    this.requestedAction=''
   }
 
   prepareField() {
@@ -53,25 +65,154 @@ export default class Tetris {
 
   update() {
 
-    // write Field into Screen memory
-    for (let x=0; x<this.nFieldWidth;x++)
-      for (let y=0; y<this.nFieldHeight; y++)
+    // affect game time
+    this.currentDuration += deltaTime // dt is global in P5js
+ 
+    if ( this.currentDuration > this.tickDuration) {
+      this.newHeartBeat=true
+      this.currentDuration -= this.tickDuration  //  ou 0 ? 
+    }
+    else {
+      this.newHeartBeat=false
+    }
+    
+    // collect input
+    // result : this.requestedAction (one letter)
+    if (keyIsPressed) {
+      //console.log(this)
+      if (keyCode == this.previousKeyCode) 
       {
-        let c= ' ABCDEFG=#'.charAt(this.pField[y*this.nFieldWidth + x])
-        this.setscreen(c,x,y+2)    
+        this.keyHeld = true  
+      } 
+      else 
+      {
+        //console.log (this)
+        switch (keyCode) {
+          case 37:
+            this.requestedAction = 'L' // move left
+            break;
+          case 38:
+            this.requestedAction = 'U' // rotate
+            break;
+          case 39:
+            this.requestedAction = 'R' // move right
+            break;
+          case 40:
+            this.requestedAction = 'D' // accelerate downwards
+            break;
+          case 32:
+            this.requestedAction = 'D' // accelerate downwards
+            break;
+  
+          case 27:
+            this.requestedAction = 'X' // exit
+            break;
+          default:
+        }
+        this.previousKeyCode=keyCode
+        this.keyHeld = false
+        // console.log(keyCode)            
       }
+    }
+    else {
+      this.keyHeld = false
+      this.previousKeyCode=0
+    }
 
-    for (let px = 0; px < 4; px++)
-      for (let py = 0; py < 4; py++) {
-        let rotated = this.Rotate(px, py, this.nCurrentRotation)
-        if (this.tetromino[this.nCurrentPiece][rotated] != '.')
-        this.pField[(this.nCurrentY + py) * this.nFieldWidth + (this.nCurrentX + px)] = this.nCurrentPiece + 1;
 
+    if (this.State == "D") {
+      // we are Delayed, don't update till delay has passed
+
+      // console.log("Pausing")
+      this.delayCounter += deltaTime
+      if ( this.delayCounter > this.delayDuration ) {
+        // console.log("End of Pause")
+        this.delayCounter = 0
+        this.delayDuration = 0
+        this.setState("R") // TODO previous state in case it would not be 'R'
       }
+      else return false;
+    }
+
+    else { // 100ms elapsed let's update for good
+      if (this.newHeartBeat) {
+        // when the correct timeslice jhas elapsed (HeartBeat), cotinue update
+        this.update_running()
+      }
+    }
+  }
+
+  update_running() {
+
+  // if (this.nCurrentY < 10) this.nCurrentY++;
+
+
+  // Handle player movement
+
+  if (this.requestedAction!='') {
+    // console.log(this.requestedAction)
+    // console.log(this.nCurrentX,this.nCurrentY)
+    switch (this.requestedAction) {
+      case 'L':
+        this.nCurrentX -= (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX - 1, this.nCurrentY)) ? 1 : 0;
+        break;
+      case 'R':
+        this.nCurrentX += (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX + 1, this.nCurrentY)) ? 1 : 0;
+        break;
+      case 'D':
+        this.nCurrentY += ( this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX, this.nCurrentY + 1)) ? 1 : 0;
+        break;
+      default:
+    }
+    this.requestedAction=''
+  }
+
+
+  // write Field into virtual screen memory
+  for (let x = 0; x < this.nFieldWidth; x++)
+    for (let y = 0; y < this.nFieldHeight; y++) {
+      let c = " ABCDEFG=#".charAt(this.pField[y * this.nFieldWidth + x]);
+      this.setscreen(c, x, y + 2);
+    }
+
+ // put piece onto virtual screen memory but not on field (display but field is unchanged)
+ for (let px = 0; px < 4; px++)
+    for (let py = 0; py < 4; py++) {
+      let rotated = this.Rotate(px, py, this.nCurrentRotation);
+      if (this.tetromino[this.nCurrentPiece][rotated] != ".")
+        {
+        let c = " ABCDEFG=#".charAt(this.nCurrentPiece+1);
+        
+        this.setscreen(c, this.nCurrentX + px , (this.nCurrentY + py +2) )        
+        }
+    }
+
+
+
+  /*
+  for (let px = 0; px < 4; px++)
+    for (let py = 0; py < 4; py++) {
+      let rotated = this.Rotate(px, py, this.nCurrentRotation);
+      if (this.tetromino[this.nCurrentPiece][rotated] != ".")
+        this.pField[
+          (this.nCurrentY + py) * this.nFieldWidth + (this.nCurrentX + px)
+        ] = this.nCurrentPiece + 1
+    }
+  */
+
+  // test pause
+  // if (this.nCurrentY==8) this.pause(8000.0)
+  //console.log("fin du update")
+  }
+
+  pause(d) {
+    console.log("Condition rencontrée, début de la pause !")
+    this.delayDuration = d
+    this.setState("D") //  D for Delay
   }
 
   draw() {
-
+    // console.log("draw")
     // R means running
     this.State=='R' && this.vs.draw() 
   }
@@ -111,7 +252,7 @@ export default class Tetris {
         //the couple px,py gives a position in the tetramino...
 
         // Get index into piece
-        let pi = Rotate(px, py, nRotation);
+        let pi = this.Rotate(px, py, nRotation);
 
         // Get index into field
         let fi = (nPosY + py) * this.nFieldWidth + (nPosX + px);
@@ -141,4 +282,10 @@ export default class Tetris {
     this.tetromino[6] = "..X...X..XX....."
   }
 
+  keyPressed()
+  {
+      console.log(this)
+      T.bKey=key
+      return false;
+  }
 }
