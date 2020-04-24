@@ -24,7 +24,7 @@ export default class Tetris {
     this.nCurrentX = this.nFieldWidth / 2;
     this.nCurrentY = 0;
 
-    this.tickDuration = 50.0  // 100ms // time base . 
+    this.tickDuration = 50.0  // 50ms // time base . 
                                // time driven events should rely on this
     this.newHeartBeat = false
     this.currentDuration = 0.0
@@ -36,6 +36,12 @@ export default class Tetris {
     this.keyHeld=false
     this.previousKeyCode=0
     this.requestedAction=''
+
+    this.stepDown = false
+    this.tickCount = 0
+    this.lvlTick = 8
+
+    this.gameOver = false
   }
 
   prepareField() {
@@ -119,7 +125,6 @@ export default class Tetris {
       this.previousKeyCode=0
     }
 
-
     if (this.State == "D") {
       // we are Delayed, don't update till delay has passed
 
@@ -134,7 +139,7 @@ export default class Tetris {
       else return false;
     }
 
-    else { // 100ms elapsed let's update for good
+    else { // duration elapsed let's update for good
       if (this.newHeartBeat) {
         // when the correct timeslice jhas elapsed (HeartBeat), cotinue update
         this.update_running()
@@ -144,65 +149,79 @@ export default class Tetris {
 
   update_running() {
 
-  // if (this.nCurrentY < 10) this.nCurrentY++;
+    // if (this.nCurrentY < 10) this.nCurrentY++;
+    this.tickCount++
 
+    this.stepDown = (this.tickCount == this.tickDuration)
 
-  // Handle player movement
+    // Handle player movement
+    if (this.requestedAction != '') {
+      // console.log(this.requestedAction)
+      // console.log(this.nCurrentX,this.nCurrentY)
+      switch (this.requestedAction) {
+        case 'L': // left
+          this.nCurrentX -= (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX - 1, this.nCurrentY)) ? 1 : 0;
+          break;
+        case 'R': // right
+          this.nCurrentX += (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX + 1, this.nCurrentY)) ? 1 : 0;
+          break;
+        case 'D': // down
+          this.nCurrentY += (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX, this.nCurrentY + 1)) ? 1 : 0;
+          break;
+        case 'U': // down
+          this.nCurrentRotation += (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation + 1, this.nCurrentX, this.nCurrentY)) ? 1 : 0;
+          break;
 
-  if (this.requestedAction!='') {
-    // console.log(this.requestedAction)
-    // console.log(this.nCurrentX,this.nCurrentY)
-    switch (this.requestedAction) {
-      case 'L':
-        this.nCurrentX -= (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX - 1, this.nCurrentY)) ? 1 : 0;
-        break;
-      case 'R':
-        this.nCurrentX += (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX + 1, this.nCurrentY)) ? 1 : 0;
-        break;
-      case 'D':
-        this.nCurrentY += ( this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX, this.nCurrentY + 1)) ? 1 : 0;
-        break;
-      default:
-    }
-    this.requestedAction=''
-  }
-
-
-  // write Field into virtual screen memory
-  for (let x = 0; x < this.nFieldWidth; x++)
-    for (let y = 0; y < this.nFieldHeight; y++) {
-      let c = " ABCDEFG=#".charAt(this.pField[y * this.nFieldWidth + x]);
-      this.setscreen(c, x, y + 2);
+        default:
+      }
+      this.requestedAction = ''
     }
 
- // put piece onto virtual screen memory but not on field (display but field is unchanged)
- for (let px = 0; px < 4; px++)
-    for (let py = 0; py < 4; py++) {
-      let rotated = this.Rotate(px, py, this.nCurrentRotation);
-      if (this.tetromino[this.nCurrentPiece][rotated] != ".")
-        {
-        let c = " ABCDEFG=#".charAt(this.nCurrentPiece+1);
-        
-        this.setscreen(c, this.nCurrentX + px , (this.nCurrentY + py +2) )        
+    // time for a step downwards 
+    if(this.stepDown) {
+      if (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX, this.nCurrentY+1)) {
+        this.nCurrentY++        
+      }
+      else {
+        // lock the piece in the field 
+        for (let px = 0; px < 4; px++)
+          for (let py = 0; py < 4; py++)
+            if (this.tetromino[this.nCurrentPiece][this.Rotate(px, py, this.nCurrentRotation)] == 'X')
+              this.pField[(this.nCurrentY + py) * this.nFieldWidth + (this.nCurrentX + px)] = this.nCurrentPiece + 1;
+
+        // check if any lines
+
+        // choose the next piece
+        this.nCurrentX = this.nFieldWidth / 2;
+        this.nCurrentY = 0;
+        this.nCurrentRotation = 0;
+        this.nCurrentPiece = Math.floor(random(7))
+
+        // if it won't fit, game over
+        this.gameOver = !(this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX, this.nCurrentY))
+      }
+      this.tickCount = 0
+    }
+
+    // write Field into virtual screen memory
+    for (let x = 0; x < this.nFieldWidth; x++)
+      for (let y = 0; y < this.nFieldHeight; y++) {
+        let c = " ABCDEFG=#".charAt(this.pField[y * this.nFieldWidth + x]);
+        this.setscreen(c, x, y + 2);
+      }
+
+    // put piece onto virtual screen memory but not on field (display but field is unchanged)
+    // to Display it
+    for (let px = 0; px < 4; px++)
+      for (let py = 0; py < 4; py++) {
+        let rotated = this.Rotate(px, py, this.nCurrentRotation);
+        if (this.tetromino[this.nCurrentPiece][rotated] != ".") {
+          let c = " ABCDEFG=#".charAt(this.nCurrentPiece + 1);
+
+          this.setscreen(c, this.nCurrentX + px, (this.nCurrentY + py + 2))
         }
-    }
+      }
 
-
-
-  /*
-  for (let px = 0; px < 4; px++)
-    for (let py = 0; py < 4; py++) {
-      let rotated = this.Rotate(px, py, this.nCurrentRotation);
-      if (this.tetromino[this.nCurrentPiece][rotated] != ".")
-        this.pField[
-          (this.nCurrentY + py) * this.nFieldWidth + (this.nCurrentX + px)
-        ] = this.nCurrentPiece + 1
-    }
-  */
-
-  // test pause
-  // if (this.nCurrentY==8) this.pause(8000.0)
-  //console.log("fin du update")
   }
 
   pause(d) {
@@ -219,7 +238,7 @@ export default class Tetris {
 
   Rotate(px, py, r) {
     let pi = 0;
-    switch (r) {
+    switch (r%4) {
       case 0:      // 0 degrees // 0 1 2 3
         pi = py * 4 + px;       // 4 5 6 7
         break;                  // 8 9 10 11
@@ -247,6 +266,7 @@ export default class Tetris {
   // if every 'filled cell', would be on zeros, then the tetramino would fit (success, return true)
   DoesPieceFit(nTetromino, nRotation, nPosX, nPosY) {
     // All Field cells >0 are occupied
+    //console.log("testing fit ", nTetromino)
     for (let px = 0; px < 4; px++)
       for (let py = 0; py < 4; py++) {
         //the couple px,py gives a position in the tetramino...
@@ -263,12 +283,17 @@ export default class Tetris {
         // just ignore them
         if (nPosX + px >= 0 && nPosX + px < this.nFieldWidth) {
           if (nPosY + py >= 0 && nPosY + py < this.nFieldHeight) {
+
             // In Bounds so do collision check
-            if (this.tetromino[nTetromino][pi] != '.' && this.pField[fi] != 0)
+//            console.log(this.tetromino[nTetromino][pi] , this.pField[fi])
+            if (this.tetromino[nTetromino][pi] != '.' && this.pField[fi] != 0) {
+              //console.log("Won't fit")
               return false; // fail on first hit
+            }
           }
         }
       }
+      //console.log("fit !")
     return true;
   }
 
@@ -282,10 +307,13 @@ export default class Tetris {
     this.tetromino[6] = "..X...X..XX....."
   }
 
+  /*
   keyPressed()
   {
       console.log(this)
       T.bKey=key
       return false;
   }
+  */
+
 }

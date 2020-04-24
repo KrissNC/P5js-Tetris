@@ -8,12 +8,9 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(640, 400);
+  createCanvas(400, 400);
   
   T = new Tetris()
-
-  //window.keyPressed = T.keyPressed
-  console.log(T)
 
 }
 
