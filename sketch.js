@@ -3,12 +3,11 @@ import Tetris from './Tetris.js'
 // let vs
 let T
 
-
 function preload() {
 }
 
 function setup() {
-  createCanvas(400, 400);
+  createCanvas(400, 300);
   
   T = new Tetris()
 
@@ -16,20 +15,20 @@ function setup() {
 
 function draw() {
 
-  // game Timing
 
+  if (T.State=="O") { // game Over
+    // Game Over
+    // To Do Special Display ?
+    
+  } else {
 
-  // input
+    T.update()
 
-  // game logic
-  if (T.nCurrentY<=16) T.update()
-
-  // Draw
-  
-  background(200)
-
-  
-  T.draw() 
+    // Draw
+    background(200)
+    
+    T.draw()   
+  }
   
 }
 

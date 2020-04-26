@@ -24,8 +24,8 @@ export default class Tetris {
     this.nCurrentX = this.nFieldWidth / 2;
     this.nCurrentY = 0;
 
-    this.tickDuration = 50.0  // 50ms // time base . 
-                               // time driven events should rely on this
+    this.tickDuration = 40.0  // time base . 
+                              // time driven events should rely on this
     this.newHeartBeat = false
     this.currentDuration = 0.0
 
@@ -41,7 +41,16 @@ export default class Tetris {
     this.tickCount = 0
     this.lvlTick = 8
 
+    this.vLines = []      // completed lines
+
+    this.cpt = 0
+
     this.gameOver = false
+
+    this.nPieceCount = 0
+    this.nSpeed = 0
+
+    this.nScore = 0
   }
 
   prepareField() {
@@ -71,9 +80,21 @@ export default class Tetris {
 
   update() {
 
+    /*
+    this.vs.gotoXY(20,10)
+    this.cpt++
+    this.vs.write(this.cpt.toString())
+
+    for (let i=0 ; i< this.nFieldHeight; i++) {
+      this.vs.gotoXY(12,i+2)
+      this.vs.write(i.toString())
+    }
+    */
+
     // affect game time
     this.currentDuration += deltaTime // dt is global in P5js
- 
+
+
     if ( this.currentDuration > this.tickDuration) {
       this.newHeartBeat=true
       this.currentDuration -= this.tickDuration  //  ou 0 ? 
@@ -107,7 +128,7 @@ export default class Tetris {
             this.requestedAction = 'D' // accelerate downwards
             break;
           case 32:
-            this.requestedAction = 'D' // accelerate downwards
+            this.requestedAction = ' ' // accelerate downwards
             break;
   
           case 27:
@@ -149,10 +170,28 @@ export default class Tetris {
 
   update_running() {
 
-    // if (this.nCurrentY < 10) this.nCurrentY++;
+    // console.log(this.State)
     this.tickCount++
 
-    this.stepDown = (this.tickCount == this.tickDuration)
+    this.stepDown = (this.tickCount == this.tickDuration) ;
+
+    // remove completed lines (occurs after a short 'D' Delay state to mark a pause)
+
+    if(this.vLines.length) { // (if there are completed lines)
+      for (let a=0; a<this.vLines.length; a++)
+        {
+        //console.log(this.pField)
+        let l = this.vLines[a]
+      
+        for (let px = 1; px < this.nFieldWidth - 1; px++) {
+          for (let py = l; py >= 0; py--)
+            this.pField[py * this.nFieldWidth + px] = this.pField[(py - 1) * this.nFieldWidth + px];
+          this.pField[px] = 0;
+          }
+      }
+      // lines are removed, data is copied, now clear the lines array
+      this.vLines=[]
+    }
 
     // Handle player movement
     if (this.requestedAction != '') {
@@ -174,22 +213,55 @@ export default class Tetris {
 
         default:
       }
-      this.requestedAction = ''
+
+      if (this.requestedAction != 'D') this.requestedAction = ''
     }
 
     // time for a step downwards 
     if(this.stepDown) {
+      // let's try to move pice down one step
       if (this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX, this.nCurrentY+1)) {
         this.nCurrentY++        
       }
       else {
+        // No way to move it : lets fix it
+
+        this.nPieceCount++;
+        if (this.nPieceCount % 10 == 0)
+          if (this.tickDuration >= 10) 
+            {
+              // accelerate
+              let newDuration = Math.floor(this.tickDuration * 0.80)
+              //console.log("Speed going down from " + this.tickDuration + " to " + newDuration)
+              this.tickDuration = newDuration
+            }
+            
+
         // lock the piece in the field 
         for (let px = 0; px < 4; px++)
           for (let py = 0; py < 4; py++)
             if (this.tetromino[this.nCurrentPiece][this.Rotate(px, py, this.nCurrentRotation)] == 'X')
               this.pField[(this.nCurrentY + py) * this.nFieldWidth + (this.nCurrentX + px)] = this.nCurrentPiece + 1;
 
-        // check if any lines
+        // Check if any lines
+        for (let py = 0; py < 4; py++) 
+          if(this.nCurrentY + py < this.nFieldHeight - 1)
+          {
+            let bLine = true;
+            for (let px = 1; px < this.nFieldWidth - 1; px++)
+              bLine &= (this.pField[(this.nCurrentY + py) * this.nFieldWidth + px]) != 0;
+            if (bLine) {
+              // set line char to 
+              for (let px = 1; px < this.nFieldWidth - 1; px++)
+                this.pField[(this.nCurrentY + py) * this.nFieldWidth + px] = 8; // putting '='
+                this.vLines.push(this.nCurrentY + py); // Adding a line in array of lines
+            }
+          }
+
+          // Score
+          this.nScore += 25;
+
+          if (this.vLines.length) this.nScore += (1 << this.vLines.length) * 100;
 
         // choose the next piece
         this.nCurrentX = this.nFieldWidth / 2;
@@ -200,6 +272,8 @@ export default class Tetris {
         // if it won't fit, game over
         this.gameOver = !(this.DoesPieceFit(this.nCurrentPiece, this.nCurrentRotation, this.nCurrentX, this.nCurrentY))
       }
+
+      //reset time counter
       this.tickCount = 0
     }
 
@@ -221,19 +295,36 @@ export default class Tetris {
           this.setscreen(c, this.nCurrentX + px, (this.nCurrentY + py + 2))
         }
       }
+    
+    // draw score
+    this.vs.gotoXY(18,5)
+    this.vs.write("SCORE :  " + this.nScore.toString() + "  ")
+
+    if (this.gameOver) {
+
+      this.vs.gotoXY(20,10)
+      this.vs.write("GAME OVER !")
+      this.vs.gotoXY(17,14)
+      this.vs.write("press F5 to restart")
+  
+      this.State="O"
+    }
+    
+    if(this.vLines.length) {
+      // there's at least one full line done, lets pause a while, for the player to acknowledge
+      this.pause(300) // nothing will occur but Display during that duration : no more updates
+    }
 
   }
 
   pause(d) {
-    console.log("Condition rencontrée, début de la pause !")
+    //console.log("début de la pause !")
     this.delayDuration = d
     this.setState("D") //  D for Delay
   }
 
-  draw() {
-    // console.log("draw")
-    // R means running
-    this.State=='R' && this.vs.draw() 
+  draw() {    
+    this.vs.draw() 
   }
 
   Rotate(px, py, r) {
@@ -285,7 +376,6 @@ export default class Tetris {
           if (nPosY + py >= 0 && nPosY + py < this.nFieldHeight) {
 
             // In Bounds so do collision check
-//            console.log(this.tetromino[nTetromino][pi] , this.pField[fi])
             if (this.tetromino[nTetromino][pi] != '.' && this.pField[fi] != 0) {
               //console.log("Won't fit")
               return false; // fail on first hit
@@ -306,14 +396,5 @@ export default class Tetris {
     this.tetromino[5] = ".X...X...XX....."
     this.tetromino[6] = "..X...X..XX....."
   }
-
-  /*
-  keyPressed()
-  {
-      console.log(this)
-      T.bKey=key
-      return false;
-  }
-  */
 
 }
