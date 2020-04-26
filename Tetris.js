@@ -231,7 +231,7 @@ export default class Tetris {
           if (this.tickDuration >= 10) 
             {
               // accelerate
-              let newDuration = Math.floor(this.tickDuration * 0.80)
+              let newDuration = Math.floor(this.tickDuration * 0.87)
               //console.log("Speed going down from " + this.tickDuration + " to " + newDuration)
               this.tickDuration = newDuration
             }
@@ -243,6 +243,7 @@ export default class Tetris {
             if (this.tetromino[this.nCurrentPiece][this.Rotate(px, py, this.nCurrentRotation)] == 'X')
               this.pField[(this.nCurrentY + py) * this.nFieldWidth + (this.nCurrentX + px)] = this.nCurrentPiece + 1;
 
+        
         // Check if any lines
         for (let py = 0; py < 4; py++) 
           if(this.nCurrentY + py < this.nFieldHeight - 1)
@@ -262,6 +263,8 @@ export default class Tetris {
           this.nScore += 25;
 
           if (this.vLines.length) this.nScore += (1 << this.vLines.length) * 100;
+
+          this.requestedAction = ''
 
         // choose the next piece
         this.nCurrentX = this.nFieldWidth / 2;
